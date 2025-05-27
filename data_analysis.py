@@ -231,7 +231,7 @@ def save_results(result: pd.DataFrame, output_path: str,
 def plot_results_plotly(result: pd.DataFrame, args):
     """使用Plotly生成可视化图表"""
     # 准备数据（排除总计行和列）
-    plot_data = result.iloc[:-1, 1:-1]
+    plot_data = result.iloc[:-1, :-1]
     
     # 创建子图布局
     fig = make_subplots(
@@ -246,7 +246,7 @@ def plot_results_plotly(result: pd.DataFrame, args):
             [{"type": "bar"}, {"type": "heatmap"}],
             [{"type": "scatter"}, {"type": "pie"}]
         ],
-        horizontal_spacing=0.15,
+        horizontal_spacing=0.20,
         vertical_spacing=0.15
     )
     
@@ -281,7 +281,15 @@ def plot_results_plotly(result: pd.DataFrame, args):
             text=heatmap_text,
             texttemplate="%{text}",
             colorscale='YlOrRd',
-            showscale=True
+            showscale=True,
+            colorbar=dict(
+                x=1.12,  # 将colorbar移到更右边
+                xpad=10,
+                len=0.45,  # 缩短colorbar长度
+                y=0.77,
+                yanchor='top'
+            ),
+            showlegend=False  # 热力图不需要在图例中显示
         ),
         row=1, col=2
     )
@@ -290,6 +298,7 @@ def plot_results_plotly(result: pd.DataFrame, args):
     fig.update_yaxes(title_text=args.category, row=1, col=2)
     
     # 3. 折线图（所有类别）
+    show_in_legend = len(plot_data.columns) <= 10
     for col in plot_data.columns:
         fig.add_trace(
             go.Scatter(
@@ -297,7 +306,8 @@ def plot_results_plotly(result: pd.DataFrame, args):
                 x=plot_data.index,
                 y=plot_data[col],
                 mode='lines+markers',
-                showlegend=True if len(plot_data.columns) <= 10 else False
+                showlegend=show_in_legend,
+                legendgroup='lines'  # 将折线图的图例分组
             ),
             row=2, col=1
         )
@@ -308,7 +318,7 @@ def plot_results_plotly(result: pd.DataFrame, args):
     # 如果类别太多，添加说明
     if len(plot_data.columns) > 10:
         fig.add_annotation(
-            text=f"共{len(plot_data.columns)}个类别",
+            text=f"共{len(plot_data.columns)}个类别（图例已隐藏）",
             xref="paper", yref="paper",
             x=0.25, y=-0.1,
             showarrow=False,
@@ -334,7 +344,8 @@ def plot_results_plotly(result: pd.DataFrame, args):
             labels=display_data.index,
             values=display_data.values,
             textinfo='label+percent',
-            hovertemplate='%{label}: %{value}<br>占比: %{percent}<extra></extra>'
+            hovertemplate='%{label}: %{value}<br>占比: %{percent}<extra></extra>',
+            showlegend=False  # 饼图不需要在图例中显示
         ),
         row=2, col=2
     )
@@ -347,8 +358,30 @@ def plot_results_plotly(result: pd.DataFrame, args):
             'xanchor': 'center',
             'font': {'size': 20}
         },
-        height=800,
+        height=900,  # 增加高度
+        width=1400,  # 设置宽度
         showlegend=True,
+        barmode='stack',
+        # 调整图例位置和样式
+        legend=dict(
+            yanchor="top",
+            y=0.98,
+            xanchor="left",
+            x=1.02,  # 将图例放在图表右侧
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="rgba(0, 0, 0, 0.2)",
+            borderwidth=1,
+            font=dict(size=10),
+            itemsizing='constant',
+            tracegroupgap=5
+        ),
+        # 调整边距
+        margin=dict(
+            l=50,
+            r=250,  # 增加右边距给图例和colorbar留空间
+            t=100,
+            b=50
+        ),
         font=dict(size=12)
     )
     
@@ -474,8 +507,8 @@ def group_by_time_period(
         margins_name='总计'
     )
     
-    # 添加时间段内总数
-    result.insert(0, '时段内总数', result.sum(axis=1))
+    # # 添加时间段内总数
+    # result.insert(0, '时段内总数', result.sum(axis=1))
     
     return result
 
@@ -528,7 +561,7 @@ def analyze_time_distribution(
     
     # 每个时期的主要类别
     for period_label in result.index[:-1]:  # 排除"总计"行
-        period_data = result.loc[period_label].drop(['时段内总数'])
+        period_data = result.loc[period_label]
         top_in_period = period_data.nlargest(3)
         analysis['top_categories_by_period'][period_label] = top_in_period.to_dict()
     
